@@ -29,7 +29,7 @@ jobs:
           pip install robotframework-requests
 
       - name: Run OpenCEP tests
-        run: robot --outputdir results/opencep openCep.robot
+        run: cd tests && robot --outputdir ../results/opencep openCep.robot
         continue-on-error: true
 
       - name: Upload OpenCEP results
@@ -58,7 +58,7 @@ jobs:
           pip install robotframework-requests
 
       - name: Run ViaCEP tests
-        run: robot --outputdir results/viacep viaCep.robot
+        run: cd tests && robot --outputdir ../results/viacep viaCep.robot
         continue-on-error: true
 
       - name: Upload ViaCEP results
