@@ -1,0 +1,129 @@
+name: Robot Framework CEP Test
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  test-opencep:
+    runs-on: ubuntu-latest
+    name: Teste OpenCEP
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install robotframework
+          pip install robotframework-requests
+
+      - name: Run OpenCEP tests
+        run: robot --outputdir results/opencep openCep.robot
+        continue-on-error: true
+
+      - name: Upload OpenCEP results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencep-results
+          path: results/opencep/
+
+  test-viacep:
+    runs-on: ubuntu-latest
+    name: Teste ViaCEP
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install robotframework
+          pip install robotframework-requests
+
+      - name: Run ViaCEP tests
+        run: robot --outputdir results/viacep viaCep.robot
+        continue-on-error: true
+
+      - name: Upload ViaCEP results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viacep-results
+          path: results/viacep/
+
+  notify-teams:
+    runs-on: ubuntu-latest
+    name: Notificar Teams
+    needs: [test-opencep, test-viacep]
+    if: always()
+    steps:
+      - name: Download OpenCEP results
+        uses: actions/download-artifact@v4
+        with:
+          name: opencep-results
+          path: results/opencep
+        continue-on-error: true
+
+      - name: Download ViaCEP results
+        uses: actions/download-artifact@v4
+        with:
+          name: viacep-results
+          path: results/viacep
+        continue-on-error: true
+
+      - name: Parse results
+        id: parse
+        run: |
+          if [ -f results/opencep/output.xml ]; then
+            OPENCEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/opencep/output.xml | head -1)
+            OPENCEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/opencep/output.xml | head -1)
+            OPENCEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/opencep/output.xml | head -1)
+            OPENCEP_STATUS="OK"
+          else
+            OPENCEP_TOTAL=0
+            OPENCEP_PASSED=0
+            OPENCEP_FAILED=0
+            OPENCEP_STATUS="FALHA"
+          fi
+          if [ -f results/viacep/output.xml ]; then
+            VIACEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/viacep/output.xml | head -1)
+            VIACEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/viacep/output.xml | head -1)
+            VIACEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/viacep/output.xml | head -1)
+            VIACEP_STATUS="OK"
+          else
+            VIACEP_TOTAL=0
+            VIACEP_PASSED=0
+            VIACEP_FAILED=0
+            VIACEP_STATUS="FALHA"
+          fi
+          echo "opencep_total=$OPENCEP_TOTAL" >> $GITHUB_OUTPUT
+          echo "opencep_passed=$OPENCEP_PASSED" >> $GITHUB_OUTPUT
+          echo "opencep_failed=$OPENCEP_FAILED" >> $GITHUB_OUTPUT
+          echo "opencep_status=$OPENCEP_STATUS" >> $GITHUB_OUTPUT
+          echo "viacep_total=$VIACEP_TOTAL" >> $GITHUB_OUTPUT
+          echo "viacep_passed=$VIACEP_PASSED" >> $GITHUB_OUTPUT
+          echo "viacep_failed=$VIACEP_FAILED" >> $GITHUB_OUTPUT
+          echo "viacep_status=$VIACEP_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Send Teams notification
+        if: always()
+        run: |
+          curl -X POST -H 'Content-Type: application/json' -d '{"@type":"MessageCard","@context":"https://schema.org/extensions","summary":"Teste CEP","themeColor":"3088aa","title":"CEP API Test","sections":[{"activityTitle":"OpenCEP - ${{ steps.parse.outputs.opencep_status }}","facts":[{"name":"Total:","value":"${{ steps.parse.outputs.opencep_total }}"},{"name":"Sucesso:","value":"${{ steps.parse.outputs.opencep_passed }}"},{"name":"Falha:","value":"${{ steps.parse.outputs.opencep_failed }}"}]},{"activityTitle":"ViaCEP - ${{ steps.parse.outputs.viacep_status }}","facts":[{"name":"Total:","value":"${{ steps.parse.outputs.viacep_total }}"},{"name":"Sucesso:","value":"${{ steps.parse.outputs.viacep_passed }}"},{"name":"Falha:","value":"${{ steps.parse.outputs.viacep_failed }}"}]}]}' '${{ secrets.TEAMS_WEBHOOK_URI }}'
+        continue-on-error: true
