@@ -1,6 +1,10 @@
 name: Robot Framework CEP Test
 
 on:
+  push:
+    branches:
+      - main
+      - develop
   schedule:
     # Rodar a cada 10 minutos
     - cron: '*/10 * * * *'
