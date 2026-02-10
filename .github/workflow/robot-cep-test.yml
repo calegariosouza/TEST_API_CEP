@@ -6,10 +6,7 @@ on:
       - main
       - develop
   schedule:
-    # Rodar a cada 10 minutos
     - cron: '*/10 * * * *'
-  
-  # Permite disparar manualmente
   workflow_dispatch:
 
 jobs:
@@ -36,23 +33,6 @@ jobs:
         run: |
           robot --outputdir results/opencep openCep.robot
         continue-on-error: true
-
-      - name: Parse OpenCEP results
-        id: opencep_result
-        run: |
-          if [ -f results/opencep/output.xml ]; then
-            TOTAL=$(grep -o 'test count="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
-            PASSED=$(grep -o 'passed="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
-            FAILED=$(grep -o 'failed="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
-            
-            echo "total=$TOTAL" >> $GITHUB_OUTPUT
-            echo "passed=$PASSED" >> $GITHUB_OUTPUT
-            echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          else
-            echo "total=0" >> $GITHUB_OUTPUT
-            echo "passed=0" >> $GITHUB_OUTPUT
-            echo "failed=1" >> $GITHUB_OUTPUT
-          fi
 
       - name: Upload OpenCEP results
         if: always()
@@ -87,23 +67,6 @@ jobs:
         run: |
           robot --outputdir results/viacep viaCep.robot
         continue-on-error: true
-
-      - name: Parse ViaCEP results
-        id: viacep_result
-        run: |
-          if [ -f results/viacep/output.xml ]; then
-            TOTAL=$(grep -o 'test count="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
-            PASSED=$(grep -o 'passed="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
-            FAILED=$(grep -o 'failed="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
-            
-            echo "total=$TOTAL" >> $GITHUB_OUTPUT
-            echo "passed=$PASSED" >> $GITHUB_OUTPUT
-            echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          else
-            echo "total=0" >> $GITHUB_OUTPUT
-            echo "passed=0" >> $GITHUB_OUTPUT
-            echo "failed=1" >> $GITHUB_OUTPUT
-          fi
 
       - name: Upload ViaCEP results
         if: always()
@@ -179,19 +142,53 @@ jobs:
           echo "viacep_status=$VIACEP_STATUS" >> $GITHUB_OUTPUT
 
       - name: Send Teams notification
-        uses: jdcargile/ms-teams-notification@v1.3
-        with:
-          github-token: ${{ github.token }}
-          ms-teams-webhook-uri: ${{ secrets.TEAMS_WEBHOOK_URI }}
-          notification-color: 3088aa
-          title: "🔍 Teste de API CEP"
-          description: |
-            **OpenCEP** ${{ steps.parse.outputs.opencep_status }}
-            • Total de CEPs testados: ${{ steps.parse.outputs.opencep_total }}
-            • CEPs com sucesso: ${{ steps.parse.outputs.opencep_passed }}
-            • CEPs com falha: ${{ steps.parse.outputs.opencep_failed }}
-
-            **ViaCEP** ${{ steps.parse.outputs.viacep_status }}
-            • Total de CEPs testados: ${{ steps.parse.outputs.viacep_total }}
-            • CEPs com sucesso: ${{ steps.parse.outputs.viacep_passed }}
-            • CEPs com falha: ${{ steps.parse.outputs.viacep_failed }}
+        run: |
+          curl -X POST \
+            -H 'Content-Type: application/json' \
+            -d @- \
+            ${{ secrets.TEAMS_WEBHOOK_URI }} << EOF
+          {
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "Teste de API CEP",
+            "themeColor": "3088aa",
+            "title": "🔍 Teste de API CEP",
+            "sections": [
+              {
+                "activityTitle": "OpenCEP ${{ steps.parse.outputs.opencep_status }}",
+                "facts": [
+                  {
+                    "name": "Total de CEPs testados:",
+                    "value": "${{ steps.parse.outputs.opencep_total }}"
+                  },
+                  {
+                    "name": "CEPs com sucesso:",
+                    "value": "${{ steps.parse.outputs.opencep_passed }}"
+                  },
+                  {
+                    "name": "CEPs com falha:",
+                    "value": "${{ steps.parse.outputs.opencep_failed }}"
+                  }
+                ]
+              },
+              {
+                "activityTitle": "ViaCEP ${{ steps.parse.outputs.viacep_status }}",
+                "facts": [
+                  {
+                    "name": "Total de CEPs testados:",
+                    "value": "${{ steps.parse.outputs.viacep_total }}"
+                  },
+                  {
+                    "name": "CEPs com sucesso:",
+                    "value": "${{ steps.parse.outputs.viacep_passed }}"
+                  },
+                  {
+                    "name": "CEPs com falha:",
+                    "value": "${{ steps.parse.outputs.viacep_failed }}"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+        continue-on-error: true
