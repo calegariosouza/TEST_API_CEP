@@ -13,7 +13,6 @@ jobs:
   test-opencep:
     runs-on: ubuntu-latest
     name: Teste OpenCEP
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,8 +29,7 @@ jobs:
           pip install robotframework-requests
 
       - name: Run OpenCEP tests
-        run: |
-          robot --outputdir results/opencep openCep.robot
+        run: robot --outputdir results/opencep openCep.robot
         continue-on-error: true
 
       - name: Upload OpenCEP results
@@ -44,7 +42,6 @@ jobs:
   test-viacep:
     runs-on: ubuntu-latest
     name: Teste ViaCEP
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,8 +58,7 @@ jobs:
           pip install robotframework-requests
 
       - name: Run ViaCEP tests
-        run: |
-          robot --outputdir results/viacep viaCep.robot
+        run: robot --outputdir results/viacep viaCep.robot
         continue-on-error: true
 
       - name: Upload ViaCEP results
@@ -77,7 +73,6 @@ jobs:
     name: Notificar Teams
     needs: [test-opencep, test-viacep]
     if: always()
-
     steps:
       - name: Download OpenCEP results
         uses: actions/download-artifact@v4
@@ -96,47 +91,32 @@ jobs:
       - name: Parse results
         id: parse
         run: |
-          # OpenCEP
           if [ -f results/opencep/output.xml ]; then
             OPENCEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/opencep/output.xml | head -1)
             OPENCEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/opencep/output.xml | head -1)
             OPENCEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/opencep/output.xml | head -1)
-            
-            if [ -z "$OPENCEP_TOTAL" ]; then OPENCEP_TOTAL=0; fi
-            if [ -z "$OPENCEP_PASSED" ]; then OPENCEP_PASSED=0; fi
-            if [ -z "$OPENCEP_FAILED" ]; then OPENCEP_FAILED=0; fi
-            
-            OPENCEP_STATUS="✅ FUNCIONANDO"
+            OPENCEP_STATUS="OK"
           else
             OPENCEP_TOTAL=0
             OPENCEP_PASSED=0
             OPENCEP_FAILED=0
-            OPENCEP_STATUS="❌ FALHA"
+            OPENCEP_STATUS="FALHA"
           fi
-
-          # ViaCEP
           if [ -f results/viacep/output.xml ]; then
             VIACEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/viacep/output.xml | head -1)
             VIACEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/viacep/output.xml | head -1)
             VIACEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/viacep/output.xml | head -1)
-            
-            if [ -z "$VIACEP_TOTAL" ]; then VIACEP_TOTAL=0; fi
-            if [ -z "$VIACEP_PASSED" ]; then VIACEP_PASSED=0; fi
-            if [ -z "$VIACEP_FAILED" ]; then VIACEP_FAILED=0; fi
-            
-            VIACEP_STATUS="✅ FUNCIONANDO"
+            VIACEP_STATUS="OK"
           else
             VIACEP_TOTAL=0
             VIACEP_PASSED=0
             VIACEP_FAILED=0
-            VIACEP_STATUS="❌ FALHA"
+            VIACEP_STATUS="FALHA"
           fi
-
           echo "opencep_total=$OPENCEP_TOTAL" >> $GITHUB_OUTPUT
           echo "opencep_passed=$OPENCEP_PASSED" >> $GITHUB_OUTPUT
           echo "opencep_failed=$OPENCEP_FAILED" >> $GITHUB_OUTPUT
           echo "opencep_status=$OPENCEP_STATUS" >> $GITHUB_OUTPUT
-
           echo "viacep_total=$VIACEP_TOTAL" >> $GITHUB_OUTPUT
           echo "viacep_passed=$VIACEP_PASSED" >> $GITHUB_OUTPUT
           echo "viacep_failed=$VIACEP_FAILED" >> $GITHUB_OUTPUT
@@ -145,52 +125,5 @@ jobs:
       - name: Send Teams notification
         if: always()
         run: |
-          curl -X POST \
-            -H 'Content-Type: application/json' \
-            -d @- \
-            ${{ secrets.TEAMS_WEBHOOK_URI }} << 'EOF'
-          {
-            "@type": "MessageCard",
-            "@context": "https://schema.org/extensions",
-            "summary": "Teste de API CEP",
-            "themeColor": "3088aa",
-            "title": "🔍 Teste de API CEP",
-            "sections": [
-              {
-                "activityTitle": "OpenCEP ${{ steps.parse.outputs.opencep_status }}",
-                "facts": [
-                  {
-                    "name": "Total testado:",
-                    "value": "${{ steps.parse.outputs.opencep_total }}"
-                  },
-                  {
-                    "name": "Sucesso:",
-                    "value": "${{ steps.parse.outputs.opencep_passed }}"
-                  },
-                  {
-                    "name": "Falha:",
-                    "value": "${{ steps.parse.outputs.opencep_failed }}"
-                  }
-                ]
-              },
-              {
-                "activityTitle": "ViaCEP ${{ steps.parse.outputs.viacep_status }}",
-                "facts": [
-                  {
-                    "name": "Total testado:",
-                    "value": "${{ steps.parse.outputs.viacep_total }}"
-                  },
-                  {
-                    "name": "Sucesso:",
-                    "value": "${{ steps.parse.outputs.viacep_passed }}"
-                  },
-                  {
-                    "name": "Falha:",
-                    "value": "${{ steps.parse.outputs.viacep_failed }}"
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
+          curl -X POST -H 'Content-Type: application/json' -d '{"@type":"MessageCard","@context":"https://schema.org/extensions","summary":"Teste CEP","themeColor":"3088aa","title":"CEP API Test","sections":[{"activityTitle":"OpenCEP - ${{ steps.parse.outputs.opencep_status }}","facts":[{"name":"Total:","value":"${{ steps.parse.outputs.opencep_total }}"},{"name":"Sucesso:","value":"${{ steps.parse.outputs.opencep_passed }}"},{"name":"Falha:","value":"${{ steps.parse.outputs.opencep_failed }}"}]},{"activityTitle":"ViaCEP - ${{ steps.parse.outputs.viacep_status }}","facts":[{"name":"Total:","value":"${{ steps.parse.outputs.viacep_total }}"},{"name":"Sucesso:","value":"${{ steps.parse.outputs.viacep_passed }}"},{"name":"Falha:","value":"${{ steps.parse.outputs.viacep_failed }}"}]}]}' '${{ secrets.TEAMS_WEBHOOK_URI }}'
         continue-on-error: true
