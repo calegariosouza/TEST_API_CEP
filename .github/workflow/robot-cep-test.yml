@@ -39,10 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: opencep-results
-          path: |
-            results/opencep/report.html
-            results/opencep/log.html
-            results/opencep/output.xml
+          path: results/opencep/
 
   test-viacep:
     runs-on: ubuntu-latest
@@ -73,10 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: viacep-results
-          path: |
-            results/viacep/report.html
-            results/viacep/log.html
-            results/viacep/output.xml
+          path: results/viacep/
 
   notify-teams:
     runs-on: ubuntu-latest
@@ -85,9 +79,6 @@ jobs:
     if: always()
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Download OpenCEP results
         uses: actions/download-artifact@v4
         with:
@@ -107,9 +98,14 @@ jobs:
         run: |
           # OpenCEP
           if [ -f results/opencep/output.xml ]; then
-            OPENCEP_TOTAL=$(grep -o 'test count="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
-            OPENCEP_PASSED=$(grep -o 'passed="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
-            OPENCEP_FAILED=$(grep -o 'failed="[0-9]*"' results/opencep/output.xml | grep -o '[0-9]*' | head -1)
+            OPENCEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/opencep/output.xml | head -1)
+            OPENCEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/opencep/output.xml | head -1)
+            OPENCEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/opencep/output.xml | head -1)
+            
+            if [ -z "$OPENCEP_TOTAL" ]; then OPENCEP_TOTAL=0; fi
+            if [ -z "$OPENCEP_PASSED" ]; then OPENCEP_PASSED=0; fi
+            if [ -z "$OPENCEP_FAILED" ]; then OPENCEP_FAILED=0; fi
+            
             OPENCEP_STATUS="✅ FUNCIONANDO"
           else
             OPENCEP_TOTAL=0
@@ -120,9 +116,14 @@ jobs:
 
           # ViaCEP
           if [ -f results/viacep/output.xml ]; then
-            VIACEP_TOTAL=$(grep -o 'test count="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
-            VIACEP_PASSED=$(grep -o 'passed="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
-            VIACEP_FAILED=$(grep -o 'failed="[0-9]*"' results/viacep/output.xml | grep -o '[0-9]*' | head -1)
+            VIACEP_TOTAL=$(grep -oP 'test count="\K[0-9]+' results/viacep/output.xml | head -1)
+            VIACEP_PASSED=$(grep -oP 'passed="\K[0-9]+' results/viacep/output.xml | head -1)
+            VIACEP_FAILED=$(grep -oP 'failed="\K[0-9]+' results/viacep/output.xml | head -1)
+            
+            if [ -z "$VIACEP_TOTAL" ]; then VIACEP_TOTAL=0; fi
+            if [ -z "$VIACEP_PASSED" ]; then VIACEP_PASSED=0; fi
+            if [ -z "$VIACEP_FAILED" ]; then VIACEP_FAILED=0; fi
+            
             VIACEP_STATUS="✅ FUNCIONANDO"
           else
             VIACEP_TOTAL=0
@@ -142,11 +143,12 @@ jobs:
           echo "viacep_status=$VIACEP_STATUS" >> $GITHUB_OUTPUT
 
       - name: Send Teams notification
+        if: always()
         run: |
           curl -X POST \
             -H 'Content-Type: application/json' \
             -d @- \
-            ${{ secrets.TEAMS_WEBHOOK_URI }} << EOF
+            ${{ secrets.TEAMS_WEBHOOK_URI }} << 'EOF'
           {
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
@@ -158,15 +160,15 @@ jobs:
                 "activityTitle": "OpenCEP ${{ steps.parse.outputs.opencep_status }}",
                 "facts": [
                   {
-                    "name": "Total de CEPs testados:",
+                    "name": "Total testado:",
                     "value": "${{ steps.parse.outputs.opencep_total }}"
                   },
                   {
-                    "name": "CEPs com sucesso:",
+                    "name": "Sucesso:",
                     "value": "${{ steps.parse.outputs.opencep_passed }}"
                   },
                   {
-                    "name": "CEPs com falha:",
+                    "name": "Falha:",
                     "value": "${{ steps.parse.outputs.opencep_failed }}"
                   }
                 ]
@@ -175,15 +177,15 @@ jobs:
                 "activityTitle": "ViaCEP ${{ steps.parse.outputs.viacep_status }}",
                 "facts": [
                   {
-                    "name": "Total de CEPs testados:",
+                    "name": "Total testado:",
                     "value": "${{ steps.parse.outputs.viacep_total }}"
                   },
                   {
-                    "name": "CEPs com sucesso:",
+                    "name": "Sucesso:",
                     "value": "${{ steps.parse.outputs.viacep_passed }}"
                   },
                   {
-                    "name": "CEPs com falha:",
+                    "name": "Falha:",
                     "value": "${{ steps.parse.outputs.viacep_failed }}"
                   }
                 ]
