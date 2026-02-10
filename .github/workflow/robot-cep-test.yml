@@ -1,0 +1,100 @@
+name: Robot Framework CEP Test
+
+on:
+  schedule:
+    # Rodar a cada 10 minutos
+    - cron: '*/10 * * * *'
+  
+  # Permite disparar manualmente
+  workflow_dispatch:
+
+jobs:
+  test-opencep:
+    runs-on: ubuntu-latest
+    name: Teste OpenCEP
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install robotframework
+          pip install robotframework-requests
+
+      - name: Run OpenCEP tests
+        run: |
+          robot --outputdir results/opencep openCep.robot
+
+      - name: Upload OpenCEP results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: opencep-results
+          path: |
+            results/opencep/report.html
+            results/opencep/log.html
+            results/opencep/output.xml
+
+      - name: Notify OpenCEP failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **ERRO em OpenCEP!** Verifique os logs.'
+            })
+
+  test-viacep:
+    runs-on: ubuntu-latest
+    name: Teste ViaCEP
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install robotframework
+          pip install robotframework-requests
+
+      - name: Run ViaCEP tests
+        run: |
+          robot --outputdir results/viacep viaCep.robot
+
+      - name: Upload ViaCEP results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: viacep-results
+          path: |
+            results/viacep/report.html
+            results/viacep/log.html
+            results/viacep/output.xml
+
+      - name: Notify ViaCEP failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **ERRO em ViaCEP!** Verifique os logs.'
+            })
