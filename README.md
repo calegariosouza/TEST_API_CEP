@@ -66,7 +66,3 @@ O pipeline executa automaticamente via **GitHub Actions** nos seguintes gatilhos
 | `push` | Branches `main` e `develop` |
 | `schedule` | A cada 10 minutos (cron) |
 | `workflow_dispatch` | Execução manual |
-
-Após os testes, os resultados são publicados como artefatos e um resumo é enviado para o **Microsoft Teams** via webhook.
-
-> ⚠️ Para ativar a notificação do Teams, configure o secret `TEAMS_WEBHOOK_URI` nas configurações do repositório.
